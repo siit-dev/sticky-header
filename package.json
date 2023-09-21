@@ -1,5 +1,5 @@
 {
-  "name": "@codingheads/sticky-header",
+  "name": "@smartimpact-it/sticky-header",
   "version": "1.0.2",
   "description": "A library that allows you to create sticky headers. It uses `position: sticky` and IntersectionObserver",
   "main": "dist/cjs/index.js",
@@ -38,7 +38,7 @@
     "build:types": "node tools/cleanup types && tsc -p config/tsconfig.types.json",
     "clean": "node tools/cleanup",
     "package": "npm run build && npm pack",
-    "addscope": "node tools/packagejson name @codingheads/lazyload",
+    "addscope": "node tools/packagejson name @smartimpact-it/lazyload",
     "postversion": "git push --follow-tags"
   },
   "publishConfig": {
@@ -54,7 +54,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Codingheads-Developer/sticky-header.git"
+    "url": "git+https://github.com/siit-dev/sticky-header.git"
   },
   "dependencies": {},
   "devDependencies": {
@@ -82,7 +82,7 @@
     "webpack-notifier": "^1.13.0"
   },
   "bugs": {
-    "url": "https://github.com/Codingheads-Developer/sticky-header/issues"
+    "url": "https://github.com/siit-dev/sticky-header/issues"
   },
-  "homepage": "https://github.com/Codingheads-Developer/sticky-header"
+  "homepage": "https://github.com/siit-dev/sticky-header"
 }
