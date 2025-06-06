@@ -10,24 +10,26 @@
  */
 
 interface StickyHeaderOptions {
-  pinnedClass?: string,
-  unpinnedClass?: string,
-  mainClass?: string,
-  offset?: number,
-  positionStickyWorkaround? : boolean,
-  addBodyClasses?: boolean,
+  pinnedClass?: string;
+  unpinnedClass?: string;
+  mainClass?: string;
+  offset?: number;
+  positionStickyWorkaround?: boolean;
+  addBodyClasses?: boolean;
+  insertObserverElementBefore?: boolean;
 }
 
 export default class StickyHeader {
   #pinnedClass: string = 'sticky-pinned';
   #unpinnedClass: string = 'sticky-unpinned';
   #mainClass: string = 'sticky';
-  #offset:number = 0;
+  #offset: number = 0;
   #positionStickyWorkaround: boolean = true;
-  #noNativeSupport:boolean = false;
+  #noNativeSupport: boolean = false;
   #element: HTMLElement = null;
   #observer: IntersectionObserver = null;
   #addBodyClasses: boolean = true;
+  #insertObserverElementBefore: boolean = false;
 
   constructor(
     element: HTMLElement,
@@ -38,6 +40,7 @@ export default class StickyHeader {
       offset = 0,
       positionStickyWorkaround = true,
       addBodyClasses = true,
+      insertObserverElementBefore = false,
     }: StickyHeaderOptions = {}
   ) {
     this.#element = element;
@@ -47,11 +50,11 @@ export default class StickyHeader {
     this.#offset = offset;
     this.#positionStickyWorkaround = positionStickyWorkaround;
     this.#addBodyClasses = addBodyClasses;
+    this.#insertObserverElementBefore = insertObserverElementBefore;
 
     // does this have native support (Modernizr test)
-    this.#noNativeSupport = document.documentElement.classList.contains(
-      'no-csspositionsticky'
-    );
+    this.#noNativeSupport =
+      document.documentElement.classList.contains('no-csspositionsticky');
 
     // initialize
     this.#init();
@@ -60,9 +63,7 @@ export default class StickyHeader {
   #init() {
     const parent = this.#element.parentElement;
     const intersectionItem = document.createElement('div');
-    let containerPosition = window
-      .getComputedStyle(parent)
-      .getPropertyValue('position');
+    let containerPosition = window.getComputedStyle(parent).getPropertyValue('position');
     this.#element.classList.add(this.#mainClass);
     // add position: relative if the class doesn't add it
     if (!containerPosition || containerPosition == 'static') {
@@ -102,22 +103,32 @@ export default class StickyHeader {
         intersectionItemOffset.style.height = '1px';
         intersectionItemOffset.style.left = '0';
         intersectionItemOffset.style.right = '0';
-        intersectionItemOffset.style.top = this.#offset - height + 'px';
+        if (this.#insertObserverElementBefore) {
+          intersectionItemOffset.style.top = this.#offset + 'px';
+        } else {
+          intersectionItemOffset.style.top = this.#offset - height + 'px';
+        }
         intersectionItem.appendChild(intersectionItemOffset);
         toObserve = intersectionItemOffset;
 
         // update the offset when the layout changes
-        const updateOffset = (newHeight: number) => {
-          if (newHeight) height = newHeight;
-          intersectionItemOffset.style.top = this.#offset - height + 'px';
-        };
-        ['resize', 'orientationchange'].forEach(type =>
-          window.addEventListener(type, () => {
-            updateOffset(this.#element.clientHeight);
-          })
-        );
+        if (!this.#insertObserverElementBefore) {
+          const updateOffset = (newHeight: number) => {
+            if (newHeight) height = newHeight;
+            intersectionItemOffset.style.top = this.#offset - height + 'px';
+          };
+          ['resize', 'orientationchange'].forEach(type =>
+            window.addEventListener(type, () => {
+              updateOffset(this.#element.clientHeight);
+            })
+          );
+        }
       }
-      parent.insertBefore(intersectionItem, this.#element.nextElementSibling);
+      if (this.#insertObserverElementBefore) {
+        parent.insertBefore(intersectionItem, this.#element);
+      } else {
+        parent.insertBefore(intersectionItem, this.#element.nextElementSibling);
+      }
     }
 
     // create the observer
@@ -130,13 +141,12 @@ export default class StickyHeader {
     entries.forEach(entry => {
       if (!entry.isIntersecting) {
         window.requestAnimationFrame(() => {
-          [
-            this.#element,
-            ...(this.#addBodyClasses ? [document.body] : []),
-          ].forEach(element => {
-            element.classList.remove(this.#unpinnedClass);
-            element.classList.add(this.#pinnedClass);
-          });
+          [this.#element, ...(this.#addBodyClasses ? [document.body] : [])].forEach(
+            element => {
+              element.classList.remove(this.#unpinnedClass);
+              element.classList.add(this.#pinnedClass);
+            }
+          );
           if (this.#noNativeSupport && this.#addBodyClasses) {
             document.body.style.paddingTop = this.#element.clientHeight + 'px';
           }
@@ -149,13 +159,12 @@ export default class StickyHeader {
         });
       } else {
         window.requestAnimationFrame(() => {
-          [
-            this.#element,
-            ...(this.#addBodyClasses ? [document.body] : []),
-          ].forEach(element => {
-            element.classList.add(this.#unpinnedClass);
-            element.classList.remove(this.#pinnedClass);
-          });
+          [this.#element, ...(this.#addBodyClasses ? [document.body] : [])].forEach(
+            element => {
+              element.classList.add(this.#unpinnedClass);
+              element.classList.remove(this.#pinnedClass);
+            }
+          );
           if (this.#noNativeSupport && this.#addBodyClasses) {
             document.body.style.paddingTop = '0';
           }

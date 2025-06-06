@@ -16,6 +16,11 @@
     {
       "name": "Bogdan Barbu",
       "email": "bogdan.b@codingheads.com"
+    },
+    {
+      "name": "SmartImpact",
+      "email": "dev@smartimpact.fr",
+      "url": "https://smartimpact.fr"
     }
   ],
   "license": "GPL-3",
