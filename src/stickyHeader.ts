@@ -4,7 +4,6 @@
  * requires IntersectionObserver
  *
  * Author: Bogdan Barbu
- * Team: Codingheads (codingheads.com)
  *
  * @format
  */
@@ -26,20 +25,22 @@ export default class StickyHeader {
   #offset: number = 0;
   #positionStickyWorkaround: boolean = true;
   #noNativeSupport: boolean = false;
-  #element: HTMLElement = null;
-  #observer: IntersectionObserver = null;
-  #heightObserver: ResizeObserver = null;
+  #element: HTMLElement | null = null;
+  #observer: IntersectionObserver | null = null;
+  #heightObserver: ResizeObserver | null = null;
   #addBodyClasses: boolean = true;
   #insertObserverElementBefore: boolean = false;
   #cachedElementHeight: number = 0;
-  #intersectionItem: HTMLElement = null;
-  #parentElement: HTMLElement = null;
+  #intersectionItem: HTMLElement | null = null;
+  #parentElement: HTMLElement | null = null;
   #parentInlinePosition: string = '';
   #shouldRestoreParentPosition: boolean = false;
   #windowListeners: Array<{
     type: 'resize' | 'orientationchange';
     handler: () => void;
   }> = [];
+  #isPinned: boolean | null = null;
+  #stickyTargets: HTMLElement[] = [];
 
   constructor(
     element: HTMLElement,
@@ -81,7 +82,7 @@ export default class StickyHeader {
       .getComputedStyle(parent)
       .getPropertyValue('position');
     const stickyPosition = window
-      .getComputedStyle(this.#element, null)
+      .getComputedStyle(this.#element)
       .getPropertyValue('position');
     this.#cachedElementHeight = this.#element.clientHeight;
 
@@ -95,7 +96,6 @@ export default class StickyHeader {
     if (!this.#offset || stickyPosition == 'sticky') {
       this.#positionStickyWorkaround = true;
     }
-    let height = this.#cachedElementHeight;
     let toObserve = intersectionItem;
     // add the intersetion observer item
     intersectionItem.classList.add('sticky-observer');
@@ -124,45 +124,37 @@ export default class StickyHeader {
         intersectionItemOffset.style.left = '0';
         intersectionItemOffset.style.right = '0';
         if (this.#insertObserverElementBefore) {
-          intersectionItemOffset.style.top = this.#offset + 'px';
+          intersectionItemOffset.style.top = `${this.#offset}px`;
         } else {
-          intersectionItemOffset.style.top = this.#offset - height + 'px';
+          intersectionItemOffset.style.top = `${this.#offset - this.#cachedElementHeight}px`;
         }
         intersectionItem.appendChild(intersectionItemOffset);
         toObserve = intersectionItemOffset;
 
         // update the offset when the layout changes
         if (!this.#insertObserverElementBefore) {
-          const updateOffset = (newHeight: number) => {
-            if (newHeight) height = newHeight;
-            intersectionItemOffset.style.top = this.#offset - height + 'px';
+          const updateOffset = () => {
+            intersectionItemOffset.style.top = `${this.#offset - this.#cachedElementHeight}px`;
           };
 
           const syncCachedHeight = () => {
+            if (!this.#element) return;
             const nextHeight = this.#element.clientHeight;
             if (!nextHeight) return;
             this.#cachedElementHeight = nextHeight;
-            updateOffset(nextHeight);
+            updateOffset();
           };
 
           if ('ResizeObserver' in window) {
-            this.#heightObserver = new ResizeObserver(entries => {
-              const entry = entries[0];
-              const size = Math.round(entry?.contentRect?.height || 0);
-              if (!size) return;
-              this.#cachedElementHeight = size;
-              updateOffset(size);
-            });
+            this.#heightObserver = new ResizeObserver(syncCachedHeight);
             this.#heightObserver.observe(this.#element);
+          } else {
+            (['resize', 'orientationchange'] as const).forEach(type => {
+              const handler = () => syncCachedHeight();
+              window.addEventListener(type, handler);
+              this.#windowListeners.push({ type, handler });
+            });
           }
-
-          (['resize', 'orientationchange'] as const).forEach(type => {
-            const handler = () => {
-              syncCachedHeight();
-            };
-            window.addEventListener(type, handler);
-            this.#windowListeners.push({ type, handler });
-          });
         }
       }
       if (this.#insertObserverElementBefore) {
@@ -171,6 +163,12 @@ export default class StickyHeader {
         parent.insertBefore(intersectionItem, this.#element.nextElementSibling);
       }
     }
+
+    // pre-compute elements to update on sticky state changes
+    this.#stickyTargets = [
+      this.#element,
+      ...(this.#addBodyClasses ? [document.body] : []),
+    ];
 
     // create the observer
     this.#observer = new IntersectionObserver(this.#setSticky);
@@ -208,60 +206,53 @@ export default class StickyHeader {
     if (this.#shouldRestoreParentPosition && this.#parentElement) {
       this.#parentElement.style.position = this.#parentInlinePosition;
     }
+
+    this.#element = null;
   }
 
   // handle intersection observer events
   #setSticky = (entries: IntersectionObserverEntry[]) => {
-    entries.forEach(entry => {
-      if (!entry.isIntersecting) {
-        window.requestAnimationFrame(() => {
-          [this.#element, ...(this.#addBodyClasses ? [document.body] : [])].forEach(
-            element => {
-              element.classList.remove(this.#unpinnedClass);
-              element.classList.add(this.#pinnedClass);
-            }
-          );
-          if (this.#noNativeSupport && this.#addBodyClasses) {
-            document.body.style.paddingTop = this.#cachedElementHeight + 'px';
-          }
-          // dispatch an event to tell that we're pinned
-          this.#element.dispatchEvent(
-            new CustomEvent('stickyIsPinned', {
-              bubbles: true,
-            })
-          );
-        });
-      } else {
-        window.requestAnimationFrame(() => {
-          [this.#element, ...(this.#addBodyClasses ? [document.body] : [])].forEach(
-            element => {
-              element.classList.add(this.#unpinnedClass);
-              element.classList.remove(this.#pinnedClass);
-            }
-          );
-          if (this.#noNativeSupport && this.#addBodyClasses) {
-            document.body.style.paddingTop = '0';
-          }
-          // dispatch an event to tell that we're unpinned
-          this.#element.dispatchEvent(
-            new CustomEvent('stickyIsUnpinned', {
-              bubbles: true,
-            })
-          );
-        });
+    const entry = entries[0];
+    if (!entry || !this.#element) return;
+    const pinned = !entry.isIntersecting;
+    if (pinned === this.#isPinned) return;
+    this.#isPinned = pinned;
+
+    if (pinned) {
+      this.#stickyTargets.forEach(el => {
+        el.classList.remove(this.#unpinnedClass);
+        el.classList.add(this.#pinnedClass);
+      });
+      if (this.#noNativeSupport && this.#addBodyClasses) {
+        document.body.style.paddingTop = `${this.#cachedElementHeight}px`;
       }
-    });
+      // dispatch an event to tell that we're pinned
+      this.#element.dispatchEvent(new CustomEvent('stickyIsPinned', { bubbles: true }));
+    } else {
+      this.#stickyTargets.forEach(el => {
+        el.classList.add(this.#unpinnedClass);
+        el.classList.remove(this.#pinnedClass);
+      });
+      if (this.#noNativeSupport && this.#addBodyClasses) {
+        document.body.style.paddingTop = '0px';
+      }
+      // dispatch an event to tell that we're unpinned
+      this.#element.dispatchEvent(new CustomEvent('stickyIsUnpinned', { bubbles: true }));
+    }
   };
 }
-(window as any).StickyHeader = StickyHeader;
 
-// register jQuery plugin if jQuery is available
-if ('jQuery' in window) {
-  (window as any).jQuery.fn.stickyHeader = function (options) {
-    this.each((_i, element) => {
-      (element as any).__stickyHeaderInstance?.destroy?.();
-      (element as any).__stickyHeaderInstance = new StickyHeader(element, options);
-    });
-    return this;
-  };
+if (typeof window !== 'undefined') {
+  (window as any).StickyHeader = StickyHeader;
+
+  // register jQuery plugin if jQuery is available
+  if ('jQuery' in window) {
+    (window as any).jQuery.fn.stickyHeader = function (options) {
+      this.each((_i, element) => {
+        (element as any).__stickyHeaderInstance?.destroy?.();
+        (element as any).__stickyHeaderInstance = new StickyHeader(element, options);
+      });
+      return this;
+    };
+  }
 }
