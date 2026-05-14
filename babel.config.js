@@ -9,9 +9,4 @@ const presets = [
   ],
 ];
 
-const plugins = [
-  ['@babel/plugin-proposal-decorators', { decoratorsBeforeExport: true }],
-  '@babel/plugin-syntax-dynamic-import',
-];
-
-module.exports = { plugins, presets };
+module.exports = { presets };

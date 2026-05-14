@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sticky Header Playground</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <aside class="control-panel">
+        <p class="eyebrow">Sticky Header</p>
+        <h1>Playground</h1>
+        <p class="lede">
+          Stress the library with live controls, a native instance, and the jQuery
+          bridge in the same page.
+        </p>
+
+        <form id="controls" class="controls">
+          <label>
+            <span>Offset</span>
+            <input id="offset" name="offset" type="range" min="0" max="96" step="8" value="24" />
+            <output id="offset-value" for="offset">24px</output>
+          </label>
+          <p id="offset-help" class="control-help">
+            The header sticks when it reaches this distance from the top edge.
+          </p>
+
+          <label class="toggle">
+            <input id="add-body-classes" name="addBodyClasses" type="checkbox" checked />
+            <span>Add body classes</span>
+          </label>
+
+          <label class="toggle">
+            <input
+              id="insert-before"
+              name="insertObserverElementBefore"
+              type="checkbox"
+            />
+            <span>Insert observer before header</span>
+          </label>
+
+          <label class="toggle">
+            <input id="simulate-native-off" name="simulateNativeOff" type="checkbox" />
+            <span>Simulate no native sticky support</span>
+          </label>
+
+          <label class="toggle">
+            <input id="expanded-header" name="expandedHeader" type="checkbox" />
+            <span>Expand header height</span>
+          </label>
+          <p class="control-help">
+            Simulates a header that changes size so you can verify the sticky
+            threshold is recalculated correctly.
+          </p>
+        </form>
+
+        <section class="status-card">
+          <h2>Live status</h2>
+          <dl>
+            <div>
+              <dt>Vanilla</dt>
+              <dd id="vanilla-status">unpinned</dd>
+            </div>
+            <div>
+              <dt>jQuery</dt>
+              <dd id="jquery-status">unpinned</dd>
+            </div>
+          </dl>
+        </section>
+      </aside>
+
+      <main class="demo-stage">
+        <div class="offset-guide" aria-hidden="true">
+          <span class="offset-guide__line"></span>
+          <span class="offset-guide__label">Offset line</span>
+        </div>
+        <section class="demo-column">
+          <div class="stack-card">
+            <p class="section-tag">Vanilla API</p>
+            <div class="sticky-stack" data-demo-root="vanilla">
+              <header class="demo-header demo-header--vanilla">
+                <div>
+                  <strong>Vanilla instance</strong>
+                  <span>Constructed with <code>new StickyHeader(...)</code></span>
+                </div>
+                <span class="chip">Live</span>
+              </header>
+              <div class="scroll-story"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="demo-column">
+          <div class="stack-card">
+            <p class="section-tag">jQuery Bridge</p>
+            <div class="sticky-stack" data-demo-root="jquery">
+              <header class="demo-header demo-header--jquery">
+                <div>
+                  <strong>jQuery instance</strong>
+                  <span>Bootstrapped through <code>$(...).stickyHeader()</code></span>
+                </div>
+                <span class="chip">Live</span>
+              </header>
+              <div class="scroll-story"></div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

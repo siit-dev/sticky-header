@@ -32,6 +32,14 @@ export default class StickyHeader {
   #addBodyClasses: boolean = true;
   #insertObserverElementBefore: boolean = false;
   #cachedElementHeight: number = 0;
+  #intersectionItem: HTMLElement = null;
+  #parentElement: HTMLElement = null;
+  #parentInlinePosition: string = '';
+  #shouldRestoreParentPosition: boolean = false;
+  #windowListeners: Array<{
+    type: 'resize' | 'orientationchange';
+    handler: () => void;
+  }> = [];
 
   constructor(
     element: HTMLElement,
@@ -64,8 +72,14 @@ export default class StickyHeader {
 
   #init() {
     const parent = this.#element.parentElement;
+    if (!parent) return;
+
+    this.#parentElement = parent;
+    this.#parentInlinePosition = parent.style.position;
     const intersectionItem = document.createElement('div');
-    const containerPosition = window.getComputedStyle(parent).getPropertyValue('position');
+    const containerPosition = window
+      .getComputedStyle(parent)
+      .getPropertyValue('position');
     const stickyPosition = window
       .getComputedStyle(this.#element, null)
       .getPropertyValue('position');
@@ -75,6 +89,7 @@ export default class StickyHeader {
     // add position: relative if the class doesn't add it
     if (!containerPosition || containerPosition == 'static') {
       parent.style.position = 'relative';
+      this.#shouldRestoreParentPosition = true;
     }
     // use the workaround if position is sticky or there's no offset set up
     if (!this.#offset || stickyPosition == 'sticky') {
@@ -86,6 +101,7 @@ export default class StickyHeader {
     intersectionItem.classList.add('sticky-observer');
     intersectionItem.style.pointerEvents = 'none';
     intersectionItem.style.visibility = 'hidden';
+    this.#intersectionItem = intersectionItem;
     if (!this.#positionStickyWorkaround) {
       // add the item to the top of the page
       intersectionItem.style.position = 'absolute';
@@ -140,11 +156,13 @@ export default class StickyHeader {
             this.#heightObserver.observe(this.#element);
           }
 
-          ['resize', 'orientationchange'].forEach(type =>
-            window.addEventListener(type, () => {
+          (['resize', 'orientationchange'] as const).forEach(type => {
+            const handler = () => {
               syncCachedHeight();
-            })
-          );
+            };
+            window.addEventListener(type, handler);
+            this.#windowListeners.push({ type, handler });
+          });
         }
       }
       if (this.#insertObserverElementBefore) {
@@ -157,6 +175,39 @@ export default class StickyHeader {
     // create the observer
     this.#observer = new IntersectionObserver(this.#setSticky);
     this.#observer.observe(toObserve);
+  }
+
+  destroy() {
+    this.#observer?.disconnect();
+    this.#observer = null;
+
+    this.#heightObserver?.disconnect();
+    this.#heightObserver = null;
+
+    this.#windowListeners.forEach(({ type, handler }) => {
+      window.removeEventListener(type, handler);
+    });
+    this.#windowListeners = [];
+
+    this.#intersectionItem?.remove();
+    this.#intersectionItem = null;
+
+    this.#element?.classList.remove(
+      this.#mainClass,
+      this.#pinnedClass,
+      this.#unpinnedClass
+    );
+
+    if (this.#addBodyClasses) {
+      document.body.classList.remove(this.#pinnedClass, this.#unpinnedClass);
+      if (this.#noNativeSupport) {
+        document.body.style.paddingTop = '0';
+      }
+    }
+
+    if (this.#shouldRestoreParentPosition && this.#parentElement) {
+      this.#parentElement.style.position = this.#parentInlinePosition;
+    }
   }
 
   // handle intersection observer events
@@ -207,7 +258,10 @@ export default class StickyHeader {
 // register jQuery plugin if jQuery is available
 if ('jQuery' in window) {
   (window as any).jQuery.fn.stickyHeader = function (options) {
-    this.each((_i, element) => new StickyHeader(element, options));
+    this.each((_i, element) => {
+      (element as any).__stickyHeaderInstance?.destroy?.();
+      (element as any).__stickyHeaderInstance = new StickyHeader(element, options);
+    });
     return this;
   };
 }

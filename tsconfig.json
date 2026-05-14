@@ -2,19 +2,18 @@
   "compilerOptions": {
     "target": "ESNext",
     "module": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "lib": ["esnext", "dom", "dom.iterable"],
-    "types": ["node"],
     "strict": false,
     "allowJs": true,
     "isolatedModules": true,
     "esModuleInterop": true,
-    "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
     "jsx": "preserve",
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
-    "useDefineForClassFields": true
+    "useDefineForClassFields": true,
+    "rootDir": "./src"
   },
   "include": ["src"]
 }
