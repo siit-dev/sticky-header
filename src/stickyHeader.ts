@@ -28,8 +28,10 @@ export default class StickyHeader {
   #noNativeSupport: boolean = false;
   #element: HTMLElement = null;
   #observer: IntersectionObserver = null;
+  #heightObserver: ResizeObserver = null;
   #addBodyClasses: boolean = true;
   #insertObserverElementBefore: boolean = false;
+  #cachedElementHeight: number = 0;
 
   constructor(
     element: HTMLElement,
@@ -63,20 +65,22 @@ export default class StickyHeader {
   #init() {
     const parent = this.#element.parentElement;
     const intersectionItem = document.createElement('div');
-    let containerPosition = window.getComputedStyle(parent).getPropertyValue('position');
+    const containerPosition = window.getComputedStyle(parent).getPropertyValue('position');
+    const stickyPosition = window
+      .getComputedStyle(this.#element, null)
+      .getPropertyValue('position');
+    this.#cachedElementHeight = this.#element.clientHeight;
+
     this.#element.classList.add(this.#mainClass);
     // add position: relative if the class doesn't add it
     if (!containerPosition || containerPosition == 'static') {
       parent.style.position = 'relative';
     }
     // use the workaround if position is sticky or there's no offset set up
-    const stickyPosition = window
-      .getComputedStyle(this.#element, null)
-      .getPropertyValue('position');
     if (!this.#offset || stickyPosition == 'sticky') {
       this.#positionStickyWorkaround = true;
     }
-    let height = this.#element.clientHeight;
+    let height = this.#cachedElementHeight;
     let toObserve = intersectionItem;
     // add the intersetion observer item
     intersectionItem.classList.add('sticky-observer');
@@ -117,9 +121,28 @@ export default class StickyHeader {
             if (newHeight) height = newHeight;
             intersectionItemOffset.style.top = this.#offset - height + 'px';
           };
+
+          const syncCachedHeight = () => {
+            const nextHeight = this.#element.clientHeight;
+            if (!nextHeight) return;
+            this.#cachedElementHeight = nextHeight;
+            updateOffset(nextHeight);
+          };
+
+          if ('ResizeObserver' in window) {
+            this.#heightObserver = new ResizeObserver(entries => {
+              const entry = entries[0];
+              const size = Math.round(entry?.contentRect?.height || 0);
+              if (!size) return;
+              this.#cachedElementHeight = size;
+              updateOffset(size);
+            });
+            this.#heightObserver.observe(this.#element);
+          }
+
           ['resize', 'orientationchange'].forEach(type =>
             window.addEventListener(type, () => {
-              updateOffset(this.#element.clientHeight);
+              syncCachedHeight();
             })
           );
         }
@@ -148,7 +171,7 @@ export default class StickyHeader {
             }
           );
           if (this.#noNativeSupport && this.#addBodyClasses) {
-            document.body.style.paddingTop = this.#element.clientHeight + 'px';
+            document.body.style.paddingTop = this.#cachedElementHeight + 'px';
           }
           // dispatch an event to tell that we're pinned
           this.#element.dispatchEvent(
